@@ -19,11 +19,10 @@ def deutsch(oracle):
 
     entangled = hi @ entangled
 
-    return get_p_of_1(entangled, 0)
+    return get_p_of_state(entangled, 0)
 
 
 print(deutsch(entangle(I, I)))
 print(deutsch(entangle(I, X)))
 print(deutsch(CNOT))
 print(deutsch(entangle(X, I) @ CNOT @ entangle(X, I)))
-

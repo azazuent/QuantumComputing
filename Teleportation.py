@@ -6,7 +6,7 @@ qubit_2 = KET0
 qubit_3 = KET0
 
 qubit_1 = turn(np.pi / 6, 'y') @ qubit_1
-print(get_p_of_1(qubit_1))
+print(get_p_of_state(qubit_1))
 
 entangled = entangle(qubit_1, qubit_2, qubit_3)
 
@@ -31,4 +31,4 @@ entangled = op4 @ entangled
 entangled = op5 @ entangled
 entangled = op6 @ entangled
 
-print(get_p_of_1(entangled, 2))
+print(get_p_of_state(entangled, 2))
