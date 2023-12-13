@@ -1,5 +1,5 @@
 import random
-
+import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
 
@@ -8,6 +8,12 @@ KET0 = np.array([[1],
 
 KET1 = np.array([[0],
                  [1]], dtype=complex)  # КЕТ1
+
+KET_PLUS = np.array([[1],
+                     [1]], dtype=complex) / np.sqrt(2)
+
+KET_MINUS = np.array([[1],
+                      [-1]], dtype=complex) / np.sqrt(2)
 
 H = np.array([
     [1, 1],
@@ -100,15 +106,45 @@ def get_p_of_state(entangled, pos=0, relation_to_0=False):
         projector = sp.kron(projector, operator)
 
     isolated_qubit = projector @ entangled @ entangled.conjugate().transpose()
-    p = sum([isolated_qubit[i][i] for i in range(entangled.size)])
+    p = np.trace(isolated_qubit)
 
     return round(np.real(p), 5)
 
 
-def measure_system(system):
-    probs = get_p_of_all_states(system)
-    measurement = [1 if random.random() < prob else 0 for prob in probs]
-    return measurement
+def measure_system(system, left_bound=0, right_bound=None):
+
+    size = round(np.log2(system.size))
+
+    if right_bound is None:
+        right_bound = size - 1
+
+    probs = []
+
+    size_of_measured = right_bound - left_bound + 1
+
+    system_dagger = system.conjugate().transpose()
+    prefix = tensordot_arb(*[I for _ in range(left_bound)])
+    postfix = tensordot_arb(*[I for _ in range(size - right_bound - 1)])
+
+    proj0 = KET0 @ KET0.transpose()
+    proj1 = KET1 @ KET1.transpose()
+
+    for i in range(2 ** size_of_measured):
+        projector = tensordot_arb(*[proj0 if c == '0' else proj1
+                                    for c in format(i, f"0{size_of_measured}b")[::-1]])
+        projector = tensordot_arb(prefix, projector, postfix)
+        probs.append(np.trace(projector @ system @ system_dagger))
+    return np.real(probs)
+
+
+def shoot(probs, shots=1024):
+    stats = [0 for _ in range(len(probs))]
+    positions = [i for i in range(len(probs))]
+    for _ in range(shots):
+        stats[random.choices(positions, probs)[0]] += 1
+    plt.bar(positions, stats)
+    plt.show()
+    return stats
 
 
 def get_p_of_all_states(system, relation_to_0=False):
@@ -179,24 +215,19 @@ def gen_swap(size):
 
     return operator
 
-def mod2x21():
-    op1 = tensordot_arb(KET0 @ KET0.transpose(), I, I, I, I)
-    op1 += tensordot_arb(KET1 @ KET1.transpose(), I, I, gen_swap(2))
 
-    op2 = tensordot_arb(KET0 @ KET0.transpose(), I, I, I, I)
-    op2 += tensordot_arb(KET1 @ KET1.transpose(), gen_swap(2), I, I)
+def n_mod_21(n: int):
 
-    op3 = tensordot_arb(I, I, gen_c_operator(2, 0, X))
-    op4 = gen_c_operator(4, 0, X)
-
-    op5 = tensordot_arb(I, I, I, gen_swap(2))
-
-    op6 = tensordot_arb(gen_swap(4), I)
-
-    op7 = tensordot_arb(I, I, gen_swap(2), I)
-    op8 = tensordot_arb(I, gen_swap(2), I, I)
-
-    return op1 @ op2 @ op3 @ op4 @ op5 @ op6 @ op7 @ op8
+    if n == 4:
+        return gen_swap(5) @ tensordot_arb(I, I, gen_swap(3))
+    elif n == 5:
+        return tensordot_arb(X, I, X, I, X) @ tensordot_arb(I, I, gen_swap(3)) @ gen_swap(5)
+    elif n == 8:
+        return tensordot_arb(gen_swap(4), I)
+    elif n == 16:
+        return tensordot_arb(I, I, gen_swap(3)) @ gen_swap(5)
+    else:
+        raise Exception(f"Modulus operator for {n} has not been implemented yet")
 
 class Qubit:
 

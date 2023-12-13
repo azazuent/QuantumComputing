@@ -16,7 +16,7 @@ def simon(oracle):
     qubits = oracle @ qubits
     qubits = simon_op @ qubits
 
-    return measure_system(qubits)
+    return set([str(measure_system(qubits)[:3]) for _ in range(20)])
 
 
 oracle = tensordot_arb(gen_c_operator(0, 3, X), I, I)
