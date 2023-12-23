@@ -2,6 +2,7 @@ import random
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
+from itertools import product
 
 KET0 = np.array([[1],
                  [0]], dtype=complex)  # Вектор КЕТ0 - (1, 0)
@@ -77,7 +78,7 @@ CH = np.array([
 def R(k):
     return np.array([
         [1, 0],
-        [0, np.e**((2 * np.pi * 1j)/(2**k))]
+        [0, np.e ** ((2 * np.pi * 1j) / (2 ** k))]
     ], dtype=complex)
 
 
@@ -111,39 +112,67 @@ def get_p_of_state(entangled, pos=0, relation_to_0=False):
     return round(np.real(p), 5)
 
 
-def measure_system(system, left_bound=0, right_bound=None):
+# def measure_system(system, left_bound=0, right_bound=None):
+#     size = round(np.log2(system.size))
+#
+#     if right_bound is None:
+#         right_bound = size - 1
+#
+#     probs = []
+#
+#     size_of_measured = right_bound - left_bound + 1
+#
+#     system_dagger = system.conjugate().transpose()
+#     prefix = tensordot_arb(*[I for _ in range(left_bound)])
+#     postfix = tensordot_arb(*[I for _ in range(size - right_bound - 1)])
+#
+#     proj0 = KET0 @ KET0.transpose()
+#     proj1 = KET1 @ KET1.transpose()
+#
+#     for i in range(2 ** size_of_measured):
+#         projector = tensordot_arb(*[proj0 if c == '0' else proj1
+#                                     for c in format(i, f"0{size_of_measured}b")[::-1]])
+#         projector = tensordot_arb(prefix, projector, postfix)
+#         probs.append(np.trace(projector @ system @ system_dagger))
+#     probs = np.real(probs)
+#     plt.bar([i for i in range(2 ** size_of_measured)], probs)
+#     plt.show()
+#     return probs
 
+
+def measure_system(system, left_bound=0, right_bound=None):
     size = round(np.log2(system.size))
 
     if right_bound is None:
         right_bound = size - 1
 
-    probs = []
-
+    size_left = left_bound
     size_of_measured = right_bound - left_bound + 1
+    size_right = size - size_of_measured - left_bound
 
-    system_dagger = system.conjugate().transpose()
-    prefix = tensordot_arb(*[I for _ in range(left_bound)])
-    postfix = tensordot_arb(*[I for _ in range(size - right_bound - 1)])
+    probs = np.zeros(2 ** size_of_measured)
 
-    proj0 = KET0 @ KET0.transpose()
-    proj1 = KET1 @ KET1.transpose()
+    combsL = list(map("".join, product("01", repeat=size_left)))
+    combsM = list(map("".join, product("01", repeat=size_of_measured)))
+    combsR = list(map("".join, product("01", repeat=size_right)))
 
-    for i in range(2 ** size_of_measured):
-        projector = tensordot_arb(*[proj0 if c == '0' else proj1
-                                    for c in format(i, f"0{size_of_measured}b")[::-1]])
-        projector = tensordot_arb(prefix, projector, postfix)
-        probs.append(np.trace(projector @ system @ system_dagger))
+    for cM in combsM:
+        for cL in combsL:
+            for cR in combsR:
+                probs[int(cM[::-1], 2)] += abs(system[int(cL + cM + cR, 2)]) * abs(system[int(cL + cM + cR, 2)])
+    probs = np.round(np.real(probs), 5)
+    plt.bar([i for i in range(2 ** size_of_measured)], probs)
+    plt.show()
     return np.real(probs)
 
 
 def shoot(probs, shots=1024):
-    stats = [0 for _ in range(len(probs))]
+    stats = {i: 0 for i in range(len(probs))}
     positions = [i for i in range(len(probs))]
-    for _ in range(shots):
-        stats[random.choices(positions, probs)[0]] += 1
-    plt.bar(positions, stats)
-    plt.show()
+    for i in range(shots):
+        index = random.choices(positions, probs)[0]
+        stats[index] += 1
+    stats = {key: stats[key] for key in stats if stats[key] != 0}
     return stats
 
 
@@ -201,8 +230,8 @@ def gen_QFT(size):
         operator = operator @ tensordot_arb(*prefix, H, *postfix)
 
         for j in range(2, size - i + 1):
-            i_operator = gen_c_operator(j-1, 0, R(j))
-            i_operator = tensordot_arb(*prefix, i_operator, *postfix[j-1:])
+            i_operator = gen_c_operator(j - 1, 0, R(j))
+            i_operator = tensordot_arb(*prefix, i_operator, *postfix[j - 1:])
             operator = operator @ i_operator
 
     return operator
@@ -217,17 +246,38 @@ def gen_swap(size):
 
 
 def n_mod_21(n: int):
+    if n == 2:
+        operator = tensordot_arb(KET0 @ KET0.transpose(), I, I, I, I) + \
+                   tensordot_arb(KET1 @ KET1.transpose(), I, I, gen_swap(2))
 
-    if n == 4:
+        operator = operator @ \
+                   (tensordot_arb(KET0 @ KET0.transpose(), I, I, I, I) +
+                    tensordot_arb(KET1 @ KET1.transpose(), gen_swap(2), I, I))
+
+        operator = operator @ tensordot_arb(I, I, gen_c_operator(2, 0, X)) @ gen_c_operator(4, 0, X)
+        operator = operator @ tensordot_arb(I, I, I, gen_swap(2))
+        operator = operator @ tensordot_arb(gen_swap(4), I)
+        operator = operator @ tensordot_arb(I, I, gen_swap(2), I)
+        operator = operator @ tensordot_arb(I, gen_swap(2), I, I)
+
+        return operator
+    elif n == 4:
         return gen_swap(5) @ tensordot_arb(I, I, gen_swap(3))
     elif n == 5:
         return tensordot_arb(X, I, X, I, X) @ tensordot_arb(I, I, gen_swap(3)) @ gen_swap(5)
     elif n == 8:
         return tensordot_arb(gen_swap(4), I)
+    elif n == 13:
+        return tensordot_arb(I, I, X, I, X)
     elif n == 16:
         return tensordot_arb(I, I, gen_swap(3)) @ gen_swap(5)
+    elif n == 17:
+        return tensordot_arb(X, I, X, I, X) @ tensordot_arb(I, I, gen_swap(3)) @ tensordot_arb(gen_swap(3), I, I)
+    elif n == 20:
+        return tensordot_arb(X, I, X, I, X)
     else:
         raise Exception(f"Modulus operator for {n} has not been implemented yet")
+
 
 class Qubit:
 
