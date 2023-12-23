@@ -7,4 +7,4 @@ Library is in a very basic state, but is capable of implementing basic quantum c
 
 Code implementing this circuit is in the Example.py file
 
-Also, repo contains implementations of Deutsch's algorithm and the quantum teleportation algorithm (ignore the BB84 pls, it's copypaste from a book).
+Also, repo contains implementations of Deutsch's, Quantum Teleportation, Deutsch-Jozsa, Simon`s and Shor's algorithms along with an example of CHSH game and BB84 encoding algorithm.
